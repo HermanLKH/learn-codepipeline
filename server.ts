@@ -1,21 +1,27 @@
-// Require the framework and instantiate it
+import Fastify from "fastify";
 
-// ESM
-import Fastify from 'fastify'
+const app = Fastify({ logger: true });
 
-const fastify = Fastify({
-    logger: true
-})
+// Health check endpoint for ALB target group
+app.get("/", async () => {
+    return { ok: true, service: "fastify", version: "1.0.0" };
+});
 
-// Declare a route
-fastify.get('/', function (request, reply) {
-    reply.send({ hello: 'fastify app' })
-})
+// Example API endpoint
+app.get("/hello", async () => {
+    return { message: "Hello from Fastify!" };
+});
 
-// Run the server!
-fastify.listen({ port: 3000 }, function (err, address) {
-    if (err) {
-        fastify.log.error(err)
-    }
-    // Server is now listening on ${address}
-})
+// In containers/ECS you must listen on 0.0.0.0
+const PORT = Number(process.env.PORT) || 3000;
+const HOST = "0.0.0.0";
+
+app
+    .listen({ port: PORT, host: HOST })
+    .then(() => {
+        app.log.info(`Server listening on http://${HOST}:${PORT}`);
+    })
+    .catch((err) => {
+        app.log.error(err);
+        process.exit(1);
+    });
