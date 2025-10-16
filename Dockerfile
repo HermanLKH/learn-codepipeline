@@ -1,38 +1,19 @@
-# Multi-stage build: compile TypeScript in a builder image, then run in a slim runtime image.
+# Bun runtime (Debian) — good OS compatibility on ECS/EC2
+FROM oven/bun:1.3-slim
 
-# --- Builder stage: installs dev deps and compiles TypeScript to /app/dist ---
-FROM node:24-slim AS build
 WORKDIR /app
 
-# Copy only package manifests first to leverage Docker layer caching
-COPY package*.json ./
+# Copy lockfile first for better layer caching (if you have one)
+COPY bun.lockb* package.json ./
 
-# Install dependencies for building (prefer npm ci for reproducible installs)
-# If your project uses pnpm locally, npm ci still works for production builds in CI.
-RUN npm ci
+# Install only production deps
+RUN bun install --frozen-lockfile --production
 
-# Copy TypeScript config and sources
-COPY server.ts ./
+# Bring in the rest of your source (server.ts, etc.)
+COPY . .
 
-# Compile to /app/dist
-RUN npm run build
-
-# --- Runtime stage: production-only dependencies and compiled output ---
-FROM node:24-slim
-WORKDIR /app
-
-# Ensure production mode for Node.js
-ENV NODE_ENV=production
-
-# Install only production dependencies
-COPY package*.json ./
-RUN npm ci --omit=dev --prefer-offline
-
-# Bring in compiled JS from the builder stage
-COPY --from=build /app/dist ./dist               
-
-# Expose the application port (Fastify listens on 3000)
+# Fastify must listen on 0.0.0.0 for containers/ALB
 EXPOSE 3000
 
-# Start the server (must match your package.json "main"/build output path)
-CMD ["node", "dist/server.js"]
+# Run your server.ts with Bun (no compile needed)
+CMD ["bun", "run", "server.ts"]

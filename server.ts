@@ -1,27 +1,27 @@
-import Fastify from "fastify";
+// server.ts
+const server = Bun.serve({
+    port: 3000,
+    hostname: "0.0.0.0", // important for Docker/ECS; use 127.0.0.1 for local only
+    fetch(req) {
+        const url = new URL(req.url);
 
-const app = Fastify({ logger: true });
+        if (url.pathname === "/") {
+            return new Response("Hello via Bun!");
+        }
 
-// Health check endpoint for ALB target group
-app.get("/", async () => {
-    return { ok: true, service: "fastify", version: "1.0.0" };
+        if (url.pathname === "/json") {
+            return Response.json({ ok: true, runtime: "bun" });
+        }
+
+        // simple static file example: /static/filename.txt
+        if (url.pathname.startsWith("/static/")) {
+            const path = url.pathname.replace("/static/", "");
+            const file = Bun.file(`./public/${path}`);
+            return file.size ? new Response(file) : new Response("Not found", { status: 404 });
+        }
+
+        return new Response("Not found", { status: 404 });
+    },
 });
 
-// Example API endpoint
-app.get("/hello", async () => {
-    return { message: "Hello from Fastify!" };
-});
-
-// In containers/ECS you must listen on 0.0.0.0
-const PORT = Number(process.env.PORT) || 3000;
-const HOST = "0.0.0.0";
-
-app
-    .listen({ port: PORT, host: HOST })
-    .then(() => {
-        app.log.info(`Server listening on http://${HOST}:${PORT}`);
-    })
-    .catch((err) => {
-        app.log.error(err);
-        process.exit(1);
-    });
+console.log(`✅ Bun server listening on http://localhost:${server.port}`);
